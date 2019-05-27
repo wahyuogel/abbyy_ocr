@@ -8,3 +8,5 @@
 /captures
 .externalNativeBuild
 /icon_pack
+/.idea/caches/
+/.idea/codeStyles/
