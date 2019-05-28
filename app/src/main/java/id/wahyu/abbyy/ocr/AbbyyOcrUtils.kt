@@ -2,7 +2,6 @@ package id.wahyu.abbyy.ocr
 
 import android.app.Activity
 import android.graphics.Bitmap
-import android.graphics.Rect
 import android.os.AsyncTask
 import android.util.Log
 import com.abbyy.mobile.rtr.Engine
@@ -52,7 +51,6 @@ class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
         try {
             engine = Engine.load(activity, licenseFileName)
             recognitionAPI = engine!!.createRecognitionCoreAPI()
-            recognitionAPI!!.textRecognitionSettings.setAreaOfInterest(Rect(0, 0, 50, 450))
             recognitionAPI!!.textRecognitionSettings.setRecognitionLanguage(Language.English)
         } catch (e: java.io.IOException) {
             // Troubleshooting for the developer
