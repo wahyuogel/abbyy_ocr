@@ -1,16 +1,27 @@
 package id.wahyu.abbyy.ocr
 
 import android.app.Activity
+import android.graphics.Bitmap
+import android.os.AsyncTask
 import android.util.Log
 import com.abbyy.mobile.rtr.Engine
-import com.abbyy.mobile.rtr.IRecognitionService
-import com.abbyy.mobile.rtr.ITextCaptureService
-import com.abbyy.mobile.rtr.ITextCaptureService.TextLine
+import com.abbyy.mobile.rtr.IRecognitionCoreAPI
+import com.abbyy.mobile.rtr.IRecognitionCoreAPI.TextRecognitionCallback
 import com.abbyy.mobile.rtr.Language
-import com.example.ocrapp.BuildConfig
 import com.example.ocrapp.R
 
-class AbbyyOcrUtils(activity: Activity) {
+class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
+    override fun onTextOrientationDetected(p0: Int) {
+
+    }
+
+    override fun onProgress(p0: Int, p1: IRecognitionCoreAPI.Warning?): Boolean {
+        return true
+    }
+
+    override fun onError(p0: Exception?) {
+
+    }
 
     // Licensing
     private val licenseFileName = "MCTT-0100-0006-6681-3414-3767.ABBYY.License"
@@ -21,8 +32,8 @@ class AbbyyOcrUtils(activity: Activity) {
 
     // The 'Abbyy RTR SDK Engine' and 'Text Capture Service' to be used in this sample application
     private var engine: Engine? = null
-    private var textCaptureService: ITextCaptureService? = null
     private var mActivity: Activity
+    private var recognitionAPI : IRecognitionCoreAPI? = null
 
     init {
         createTextCaptureService(activity)
@@ -34,42 +45,7 @@ class AbbyyOcrUtils(activity: Activity) {
         // Initialize the engine and text capture service
         try {
             engine = Engine.load(activity, licenseFileName)
-            textCaptureService = engine!!.createTextCaptureService(object : ITextCaptureService.Callback {
-
-                override fun onRequestLatestFrame(buffer: ByteArray) {}
-
-                override fun onFrameProcessed(
-                    p0: Array<out TextLine>?,
-                    p1: IRecognitionService.ResultStabilityStatus?,
-                    p2: IRecognitionService.Warning?
-                ) {
-                    TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
-                }
-
-
-                override fun onError(e: Exception) {
-                    // An error occurred while processing. Log it. Processing will continue
-                    if (BuildConfig.DEBUG) {
-                        // Make the error easily visible to the developer
-                        var message: String? = e.message
-                        if (message == null) {
-                            message = "Unspecified error while creating the service. See logcat for details."
-                        } else {
-                            if (message.contains("ChineseJapanese.rom")) {
-                                message =
-                                    "Chinese, Japanese and Korean are available in EXTENDED version only. Contact us for more information."
-                            }
-                            if (message.contains("Russian.edc")) {
-                                message =
-                                    "Cyrillic script languages are available in EXTENDED version only. Contact us for more information."
-                            } else if (message.contains(".trdic")) {
-                                message =
-                                    "Translation is available in EXTENDED version only. Contact us for more information."
-                            }
-                        }
-                    }
-                }
-            })
+            recognitionAPI = engine!!.createRecognitionCoreAPI()
 
             return true
         } catch (e: java.io.IOException) {
@@ -87,15 +63,47 @@ class AbbyyOcrUtils(activity: Activity) {
     }
 
     // Start recognition
-    private fun startRecognition() {
-        // Start the service
-       // textCaptureService.start(cameraPreviewSize.width, cameraPreviewSize.height, orientation, areaOfInterest)
-
+    internal fun startRecognition(bitmap: Bitmap){
+        RecognitionTask().execute(RecognitionData(bitmap,recognitionAPI!!,this))
     }
 
     // Stop recognition
     internal fun stopRecognition() {
-
+        recognitionAPI!!.close()
     }
 
+    data class RecognitionData(
+        val image: Bitmap,
+        val recognitionApi: IRecognitionCoreAPI,
+        val callback: TextRecognitionCallback
+    )
+
+    class RecognitionTask : AsyncTask<RecognitionData, String, String>() {
+
+        companion object {
+            private val TAG = RecognitionTask::class.java.simpleName
+        }
+
+        override fun onPreExecute() {
+            super.onPreExecute()
+            Log.d(TAG, "onPreExecute: " )
+        }
+
+        override fun doInBackground(vararg data: RecognitionData): String {
+            val recognitionApi = data[0].recognitionApi
+            val image = data[0].image
+            val callback = data[0].callback
+            var stringBuffer = StringBuffer()
+            for(textBlock : IRecognitionCoreAPI.TextBlock? in recognitionApi.recognizeText(image,callback)){
+               for(textLine : IRecognitionCoreAPI.TextLine? in textBlock!!.TextLines){
+                   stringBuffer.append(textLine!!.Text + "\n")
+               }
+            }
+            return stringBuffer.toString()
+        }
+
+        override fun onPostExecute(s: String) {
+            Log.d("ABBYY OCR RESULT", s)
+        }
+    }
 }

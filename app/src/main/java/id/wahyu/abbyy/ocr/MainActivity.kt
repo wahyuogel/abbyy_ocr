@@ -1,68 +1,63 @@
 package id.wahyu.abbyy.ocr
 
-import android.Manifest
-import android.content.Intent
+import android.graphics.Bitmap
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 import android.view.View
+import android.widget.AdapterView
+import android.widget.ArrayAdapter
 import com.example.ocrapp.R
-import com.karumi.dexter.Dexter
-import com.karumi.dexter.PermissionToken
-import com.karumi.dexter.listener.PermissionDeniedResponse
-import com.karumi.dexter.listener.PermissionGrantedResponse
-import com.karumi.dexter.listener.PermissionRequest
-import com.karumi.dexter.listener.single.PermissionListener
+import id.wahyu.abbyy.ocr.BitmapUtils.BitmapUtils.getBitmapFromAsset
 import kotlinx.android.synthetic.main.activity_main.*
-import pl.aprilapps.easyphotopicker.DefaultCallback
-import pl.aprilapps.easyphotopicker.EasyImage
-import java.io.File
-import java.io.IOException
 
 
-class MainActivity : AppCompatActivity() {
+class MainActivity :  AppCompatActivity(), AdapterView.OnItemSelectedListener {
 
-    private var isPermitted: Boolean = false
+    private var mSelectedImage: Bitmap? = null
+    private var abbyyOcrUtils : AbbyyOcrUtils? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        abbyyOcrUtils = AbbyyOcrUtils(this@MainActivity)
+        button.setOnClickListener{ startPrediction()}
+        val items = arrayOf(
+            "KTP 1",
+            "KTP 2",
+            "KTP 3")
+        val adapter = ArrayAdapter(this, android.R.layout
+            .simple_spinner_dropdown_item, items)
+        spinner.adapter = adapter
+        spinner.onItemSelectedListener = this
 
-        Dexter.withActivity(this)
-            .withPermission(Manifest.permission.READ_EXTERNAL_STORAGE)
-            .withListener(object : PermissionListener {
-                override fun onPermissionGranted(response: PermissionGrantedResponse) {/* ... */
-                    EasyImage.openGallery(this@MainActivity, 123)
-                    isPermitted = true
-                }
-
-                override fun onPermissionDenied(response: PermissionDeniedResponse) {/* ... */
-                }
-
-                override fun onPermissionRationaleShouldBeShown(
-                    permission: PermissionRequest,
-                    token: PermissionToken
-                ) {/* ... */
-                }
-            }).check()
-
-        if(isPermitted)
-            button.setOnClickListener(View.OnClickListener {
-                EasyImage.openGallery(this@MainActivity, 123)
-            })
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        EasyImage.handleActivityResult(requestCode, resultCode, data, this, object : DefaultCallback() {
-            override fun onImagePicked(imageFile: File?, source: EasyImage.ImageSource?, type: Int) {
-                try {
-//                    var image = FirebaseVisionImage.fromFilePath(this@MainActivity, Uri.fromFile(imageFile))
 
-                } catch (e: IOException) {
-                    e.printStackTrace()
-                }
-            }
+    override fun onItemSelected(parent: AdapterView<*>, v: View, position: Int, id: Long) {
+        mSelectedImage = null
+        when (position) {
+            0 -> mSelectedImage = getBitmapFromAsset(this, "ktp_1.jpg")
+            1 -> mSelectedImage = getBitmapFromAsset(this, "ktp_2.jpg")
+            2 -> mSelectedImage = getBitmapFromAsset(this, "ktp_3.jpg")
+        }
+        image_view!!.setImageBitmap(mSelectedImage)
 
-        })
     }
+
+    private fun startPrediction(){
+        val croppedImage = BitmapUtils.BitmapUtils.cropImage(mSelectedImage!!, 425, 40, 210, 100)
+        image_view2!!.setImageBitmap(croppedImage)
+        abbyyOcrUtils!!.startRecognition(mSelectedImage!!)
+    }
+
+    override fun onNothingSelected(parent: AdapterView<*>) {
+        // Do nothing
+    }
+
+    override fun onStop() {
+        abbyyOcrUtils!!.stopRecognition()
+        super.onStop()
+    }
+
 
 }
