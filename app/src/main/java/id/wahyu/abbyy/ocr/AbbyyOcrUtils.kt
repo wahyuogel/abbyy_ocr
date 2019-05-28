@@ -2,6 +2,7 @@ package id.wahyu.abbyy.ocr
 
 import android.app.Activity
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.os.AsyncTask
 import android.util.Log
 import com.abbyy.mobile.rtr.Engine
@@ -11,8 +12,13 @@ import com.abbyy.mobile.rtr.Language
 import com.example.ocrapp.R
 
 class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
-    override fun onTextOrientationDetected(p0: Int) {
+    companion object {
+        private val TAG = AbbyyOcrUtils::class.java.simpleName
+    }
 
+
+    override fun onTextOrientationDetected(p0: Int) {
+        Log.d(TAG, "" + p0)
     }
 
     override fun onProgress(p0: Int, p1: IRecognitionCoreAPI.Warning?): Boolean {
@@ -20,7 +26,7 @@ class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
     }
 
     override fun onError(p0: Exception?) {
-
+        Log.d(TAG, "" + p0)
     }
 
     // Licensing
@@ -30,24 +36,22 @@ class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
         Language.Indonesian
     )
 
-    // The 'Abbyy RTR SDK Engine' and 'Text Capture Service' to be used in this sample application
+    // The 'Abbyy RTR SDK Engine' to be used in this sample application
     private var engine: Engine? = null
     private var mActivity: Activity
-    private var recognitionAPI : IRecognitionCoreAPI? = null
+    private var recognitionAPI: IRecognitionCoreAPI? = null
 
     init {
-        createTextCaptureService(activity)
+        createEngine(activity)
         mActivity = activity
     }
 
-    // Load ABBYY RTR SDK engine and configure the text capture service
-    private fun createTextCaptureService(activity: Activity): Boolean {
-        // Initialize the engine and text capture service
+    // Load ABBYY RTR SDK engine
+    private fun createEngine(activity: Activity) {
+        // Initialize the engine
         try {
             engine = Engine.load(activity, licenseFileName)
             recognitionAPI = engine!!.createRecognitionCoreAPI()
-
-            return true
         } catch (e: java.io.IOException) {
             // Troubleshooting for the developer
             Log.e(activity.getString(R.string.app_name), "Error loading ABBYY RTR SDK:", e)
@@ -58,13 +62,13 @@ class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
             // Troubleshooting for the developer
             Log.e(activity.getString(R.string.app_name), "Error loading ABBYY RTR SDK:", e)
         }
-
-        return false
     }
 
     // Start recognition
-    internal fun startRecognition(bitmap: Bitmap){
-        RecognitionTask().execute(RecognitionData(bitmap,recognitionAPI!!,this))
+    internal fun startRecognition(bitmap: Bitmap) {
+        recognitionAPI!!.textRecognitionSettings.setAreaOfInterest(Rect(0, 0, 400, 400))
+        recognitionAPI!!.textRecognitionSettings.setRecognitionLanguage(Language.English)
+        RecognitionTask().execute(RecognitionData(bitmap, recognitionAPI!!, this))
     }
 
     // Stop recognition
@@ -79,26 +83,29 @@ class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
     )
 
     class RecognitionTask : AsyncTask<RecognitionData, String, String>() {
-
         companion object {
             private val TAG = RecognitionTask::class.java.simpleName
         }
 
         override fun onPreExecute() {
             super.onPreExecute()
-            Log.d(TAG, "onPreExecute: " )
+            Log.d(TAG, "onPreExecute: ")
         }
 
         override fun doInBackground(vararg data: RecognitionData): String {
             val recognitionApi = data[0].recognitionApi
             val image = data[0].image
             val callback = data[0].callback
-            var stringBuffer = StringBuffer()
-            for(textBlock : IRecognitionCoreAPI.TextBlock? in recognitionApi.recognizeText(image,callback)){
-               for(textLine : IRecognitionCoreAPI.TextLine? in textBlock!!.TextLines){
-                   stringBuffer.append(textLine!!.Text + "\n")
-               }
-            }
+            val stringBuffer = StringBuffer()
+            var textBlocks  = recognitionApi.recognizeText(image, callback)
+            if (textBlocks != null)
+                for (textBlock: IRecognitionCoreAPI.TextBlock? in textBlocks) {
+                    for (textLine: IRecognitionCoreAPI.TextLine? in textBlock!!.TextLines) {
+                        stringBuffer.append(textLine!!.Text + "\n")
+                    }
+                }
+            else
+                stringBuffer.append("ERROR ::: No text blocks found. Try Again")
             return stringBuffer.toString()
         }
 
