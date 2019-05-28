@@ -47,7 +47,22 @@ class MainActivity :  AppCompatActivity(), AdapterView.OnItemSelectedListener {
     private fun startPrediction(){
         val croppedImage = BitmapUtils.BitmapUtils.cropImage(mSelectedImage!!, 425, 40, 210, 100)
         image_view2!!.setImageBitmap(croppedImage)
-        abbyyOcrUtils!!.startRecognition(mSelectedImage!!)
+        abbyyOcrUtils!!.startRecognition(mSelectedImage!!, object : AbbyyOcrUtils.RecognitionTask.RecognitionTaskListener{
+            override fun onCompleted(result: String?) {
+                progressbar.visibility = View.GONE
+                text_view.text = result
+            }
+
+            override fun onError(errorMessage: String?) {
+                progressbar.visibility = View.GONE
+                text_view.text = errorMessage
+            }
+
+            override fun onStarted() {
+                progressbar.visibility = View.VISIBLE
+                text_view.text = ""
+            }
+        })
     }
 
     override fun onNothingSelected(parent: AdapterView<*>) {

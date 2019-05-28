@@ -52,6 +52,8 @@ class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
         try {
             engine = Engine.load(activity, licenseFileName)
             recognitionAPI = engine!!.createRecognitionCoreAPI()
+            recognitionAPI!!.textRecognitionSettings.setAreaOfInterest(Rect(0, 0, 50, 450))
+            recognitionAPI!!.textRecognitionSettings.setRecognitionLanguage(Language.English)
         } catch (e: java.io.IOException) {
             // Troubleshooting for the developer
             Log.e(activity.getString(R.string.app_name), "Error loading ABBYY RTR SDK:", e)
@@ -65,10 +67,9 @@ class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
     }
 
     // Start recognition
-    internal fun startRecognition(bitmap: Bitmap) {
-        recognitionAPI!!.textRecognitionSettings.setAreaOfInterest(Rect(0, 0, 400, 400))
-        recognitionAPI!!.textRecognitionSettings.setRecognitionLanguage(Language.English)
-        RecognitionTask().execute(RecognitionData(bitmap, recognitionAPI!!, this))
+    internal fun startRecognition(bitmap: Bitmap, callback : RecognitionTask.RecognitionTaskListener) {
+
+        RecognitionTask(callback).execute(RecognitionData(bitmap, recognitionAPI!!, this))
     }
 
     // Stop recognition
@@ -82,13 +83,26 @@ class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
         val callback: TextRecognitionCallback
     )
 
-    class RecognitionTask : AsyncTask<RecognitionData, String, String>() {
+    class RecognitionTask(val listener : RecognitionTaskListener) : AsyncTask<RecognitionData, String, String>() {
         companion object {
             private val TAG = RecognitionTask::class.java.simpleName
         }
 
+        interface RecognitionTaskListener {
+            // callback for start
+            fun onStarted()
+
+            // callback on success
+            fun onCompleted(result : String?)
+
+            // callback on error
+            fun onError(errorMessage: String?)
+
+        }
+
         override fun onPreExecute() {
             super.onPreExecute()
+            listener.onStarted()
             Log.d(TAG, "onPreExecute: ")
         }
 
@@ -98,19 +112,29 @@ class AbbyyOcrUtils(activity: Activity) : TextRecognitionCallback {
             val callback = data[0].callback
             val stringBuffer = StringBuffer()
             var textBlocks  = recognitionApi.recognizeText(image, callback)
-            if (textBlocks != null)
-                for (textBlock: IRecognitionCoreAPI.TextBlock? in textBlocks) {
-                    for (textLine: IRecognitionCoreAPI.TextLine? in textBlock!!.TextLines) {
-                        stringBuffer.append(textLine!!.Text + "\n")
+            if (textBlocks != null) {
+                try {
+                    for (textBlock: IRecognitionCoreAPI.TextBlock? in textBlocks) {
+                        for (textLine: IRecognitionCoreAPI.TextLine? in textBlock!!.TextLines) {
+                            stringBuffer.append(textLine!!.Text + "\n")
+                        }
                     }
+                    return stringBuffer.toString()
+                }catch (e : java.lang.Exception){
+                    return "Error : " + e.message
                 }
+
+            }
             else
-                stringBuffer.append("ERROR ::: No text blocks found. Try Again")
-            return stringBuffer.toString()
+                return "Error : " + "No text blocks found"
         }
 
-        override fun onPostExecute(s: String) {
-            Log.d("ABBYY OCR RESULT", s)
+        override fun onPostExecute(result: String) {
+            if(result.contains("Error")){
+                listener.onError(result)
+            }else{
+                listener.onCompleted(result)
+            }
         }
     }
 }
